@@ -1,0 +1,90 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.1'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'com.google.protobuf' version '0.9.5'
+}
+
+group = 'com.profile.rescue'
+version = '0.0.1-SNAPSHOT'
+description = 'Demo project for Spring Boot'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('springGrpcVersion', "1.0.1")
+}
+
+dependencies {
+	// Spring Data JPA
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	
+	// gRPC
+	implementation 'io.grpc:grpc-services'
+	implementation 'org.springframework.grpc:spring-grpc-spring-boot-starter'
+	
+	// PostgreSQL + PostGIS (Hibernate Spatial 7.x for Spring Boot 4/Hibernate 7)
+	runtimeOnly 'org.postgresql:postgresql'
+	implementation 'org.hibernate.orm:hibernate-spatial:7.0.0.Final'
+	
+	// RabbitMQ for rescue alert dispatch  
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+	
+	// Jackson for JSON serialization (required by Spring AMQP)
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	
+	// Lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	
+	// Observability - Actuator + Prometheus
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+	
+	// Test
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	testImplementation 'org.springframework.grpc:spring-grpc-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.grpc:spring-grpc-dependencies:${springGrpcVersion}"
+	}
+}
+
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:4.29.3"
+	}
+	plugins {
+		grpc {
+			artifact = "io.grpc:protoc-gen-grpc-java:1.70.0"
+		}
+	}
+	generateProtoTasks {
+		all()*.plugins {
+			grpc {
+				option '@generated=omit'
+			}
+		}
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package com.profile.rescue;
+
+option java_multiple_files = true;
+option java_package = "com.profile.rescue.grpc";
+option java_outer_classname = "ProfileServiceProto";
+
+// Profile Service for User and Pet management
+service ProfileService {
+  rpc CreateUserProfile (CreateUserRequest) returns (UserProfileResponse);
+  rpc GetUserProfile (GetUserRequest) returns (UserProfileResponse);
+  rpc AddPet (AddPetRequest) returns (PetResponse);
+  rpc GetPetsByUser (GetPetsRequest) returns (PetListResponse);
+}
+
+// Request to create a new user profile
+message CreateUserRequest {
+  string firebase_uid = 1;  
+  string email = 2;
+  string full_name = 3;
+  string fcm_token = 4;     
+}
+
+// Request to get user profile by firebase UID
+message GetUserRequest {
+  string firebase_uid = 1;
+}
+
+// User profile response
+message UserProfileResponse {
+  string user_id = 1;      
+  string full_name = 2;
+  string email = 3;
+  bool is_verified = 4;
+  string created_at = 5;
+}
+
+// Request to add a new pet
+message AddPetRequest {
+  string user_id = 1;
+  string name = 2;
+  string breed = 3;
+  int32 age_months = 4;
+  string image_url = 5;
+}
+
+// Pet response
+message PetResponse {
+  string pet_id = 1;
+  string name = 2;
+  string breed = 3;
+  int32 age_months = 4;
+  string image_url = 5;
+  string created_at = 6;
+}
+
+// Request to get pets by user ID
+message GetPetsRequest {
+  string user_id = 1;
+}
+
+// List of pets response
+message PetListResponse {
+  repeated PetResponse pets = 1;
+}

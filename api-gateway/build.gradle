@@ -1,0 +1,81 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.petbuddy'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    dgsVersion = '9.2.2'
+    // Use gRPC 1.70 and protobuf 4.29 to match profile-rescue-svc (Spring gRPC 1.0.1)
+    grpcVersion = '1.70.0'
+    protocVersion = '4.29.3'
+}
+
+dependencies {
+    // Spring Web
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    
+    // Netflix DGS GraphQL
+    implementation platform("com.netflix.graphql.dgs:graphql-dgs-platform-dependencies:${dgsVersion}")
+    implementation 'com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter'
+    
+    // gRPC Client - aligned with Spring gRPC 1.0.1 versions
+    implementation "io.grpc:grpc-netty-shaded:${grpcVersion}"
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    implementation "com.google.protobuf:protobuf-java:${protocVersion}"
+    implementation 'javax.annotation:javax.annotation-api:1.3.2'
+    
+    
+    // Firebase Admin SDK - exclude protobuf to use our version
+    implementation('com.google.firebase:firebase-admin:9.4.2') {
+        exclude group: 'com.google.protobuf', module: 'protobuf-java'
+    }
+    
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    
+    // Observability - Actuator + Prometheus
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Include generated stubs from backend services
+sourceSets {
+    main {
+        java {
+            srcDirs += '../profile-rescue-svc/demo/build/generated/sources/proto/main/java'
+            srcDirs += '../profile-rescue-svc/demo/build/generated/sources/proto/main/grpc'
+            srcDirs += '../social-stream-svc/build/generated/sources/proto/main/java'
+            srcDirs += '../social-stream-svc/build/generated/sources/proto/main/grpc'
+        }
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

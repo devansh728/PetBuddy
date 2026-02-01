@@ -1,0 +1,160 @@
+type Mutation {
+  # User registration
+  registerUser(input: RegisterUserInput!): UserProfile
+
+  # Social - Create post
+  createPost(input: CreatePostInput!): Post
+
+  # Social - Toggle like on a post
+  toggleLike(postId: ID!): LikeResult
+
+  # Rescue - Update user location (for volunteers)
+  updateLocation(
+    latitude: Float!
+    longitude: Float!
+    isVolunteer: Boolean!
+  ): Boolean
+
+  # Rescue - Report an incident
+  reportIncident(input: ReportIncidentInput!): Incident
+}
+
+type Query {
+  # Get current user's profile
+  getProfile: UserProfile
+
+  # Get user's pets
+  getPets: [Pet]
+
+  # Get social feed
+  getFeed(page: Int = 0, pageSize: Int = 20): FeedResult
+
+  # Get presigned upload URL for media
+  getUploadUrl(fileName: String!, contentType: String!): UploadUrlResult
+
+  # Get single post
+  getPost(postId: ID!): Post
+
+  # Rescue - Get nearby incidents
+  getNearbyIncidents(
+    latitude: Float!
+    longitude: Float!
+    radiusMeters: Float
+  ): [Incident]
+}
+
+# ==================== USER PROFILE ====================
+
+input RegisterUserInput {
+  fullName: String!
+  email: String!
+  fcmToken: String
+}
+
+type UserProfile {
+  userId: ID!
+  fullName: String!
+  email: String!
+  isVerified: Boolean!
+  isVolunteer: Boolean
+  latitude: Float
+  longitude: Float
+  createdAt: String
+}
+
+input AddPetInput {
+  name: String!
+  breed: String
+  ageMonths: Int
+  imageUrl: String
+}
+
+type Pet {
+  petId: ID!
+  name: String!
+  breed: String
+  ageMonths: Int
+  imageUrl: String
+  createdAt: String
+}
+
+# ==================== SOCIAL ====================
+
+input CreatePostInput {
+  caption: String
+  mediaKey: String!
+  locationLat: Float
+  locationLon: Float
+}
+
+type Post {
+  postId: ID!
+  userId: ID!
+  caption: String
+  mediaUrl: String
+  locationLat: Float
+  locationLon: Float
+  likeCount: Int!
+  commentCount: Int!
+  isLiked: Boolean!
+  createdAt: String
+}
+
+type FeedResult {
+  posts: [Post!]!
+  totalPages: Int!
+  hasMore: Boolean!
+}
+
+type LikeResult {
+  isLiked: Boolean!
+  likeCount: Int!
+}
+
+type UploadUrlResult {
+  uploadUrl: String!
+  mediaKey: String!
+  expiresInSeconds: Int!
+}
+
+# ==================== RESCUE ====================
+
+enum IncidentType {
+  UNKNOWN
+  ACCIDENT
+  ABANDONED
+  INJURED
+  LOST
+  ABUSE
+}
+
+enum IncidentStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+input ReportIncidentInput {
+  latitude: Float!
+  longitude: Float!
+  type: IncidentType!
+  description: String
+  animalType: String
+  imageUrl: String
+}
+
+type Incident {
+  incidentId: ID!
+  reporterId: ID!
+  latitude: Float!
+  longitude: Float!
+  type: IncidentType!
+  status: IncidentStatus!
+  description: String
+  animalType: String
+  imageUrl: String
+  volunteersNotified: Int!
+  createdAt: String
+}

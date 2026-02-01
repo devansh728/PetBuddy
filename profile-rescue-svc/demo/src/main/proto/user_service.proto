@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package com.profile.rescue;
+
+option java_multiple_files = true;
+option java_package = "com.profile.rescue.grpc";
+option java_outer_classname = "ProfileServiceProto";
+
+// Profile Service for User and Pet management
+service ProfileService {
+  rpc CreateUserProfile (CreateUserRequest) returns (UserProfileResponse);
+  rpc GetUserProfile (GetUserRequest) returns (UserProfileResponse);
+  rpc AddPet (AddPetRequest) returns (PetResponse);
+  rpc GetPetsByUser (GetPetsRequest) returns (PetListResponse);
+  
+  // Rescue Module - Geospatial Operations
+  rpc UpdateUserLocation (LocationRequest) returns (Empty);
+  rpc ReportIncident (IncidentRequest) returns (IncidentResponse);
+  rpc GetNearbyIncidents (NearbyRequest) returns (IncidentListResponse);
+}
+
+// Empty response for void operations
+message Empty {}
+
+// Request to create a new user profile
+message CreateUserRequest {
+  string firebase_uid = 1;  
+  string email = 2;
+  string full_name = 3;
+  string fcm_token = 4;     
+}
+
+// Request to get user profile by firebase UID
+message GetUserRequest {
+  string firebase_uid = 1;
+}
+
+// User profile response
+message UserProfileResponse {
+  string user_id = 1;      
+  string full_name = 2;
+  string email = 3;
+  bool is_verified = 4;
+  string created_at = 5;
+  bool is_volunteer = 6;
+  double latitude = 7;
+  double longitude = 8;
+}
+
+// Request to add a new pet
+message AddPetRequest {
+  string user_id = 1;
+  string name = 2;
+  string breed = 3;
+  int32 age_months = 4;
+  string image_url = 5;
+}
+
+// Pet response
+message PetResponse {
+  string pet_id = 1;
+  string name = 2;
+  string breed = 3;
+  int32 age_months = 4;
+  string image_url = 5;
+  string created_at = 6;
+}
+
+// Request to get pets by user ID
+message GetPetsRequest {
+  string user_id = 1;
+}
+
+// List of pets response
+message PetListResponse {
+  repeated PetResponse pets = 1;
+}
+
+// ==================== RESCUE MODULE ====================
+
+// Update user's current location (for volunteers)
+message LocationRequest {
+  string user_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  bool is_volunteer = 4;  // Mark user as available volunteer
+}
+
+// Incident types
+enum IncidentType {
+  UNKNOWN = 0;
+  ACCIDENT = 1;
+  ABANDONED = 2;
+  INJURED = 3;
+  LOST = 4;
+  ABUSE = 5;
+}
+
+// Incident status
+enum IncidentStatus {
+  STATUS_UNKNOWN = 0;
+  OPEN = 1;
+  ASSIGNED = 2;
+  IN_PROGRESS = 3;
+  RESOLVED = 4;
+  CANCELLED = 5;
+}
+
+// Report a new rescue incident
+message IncidentRequest {
+  string reporter_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  IncidentType type = 4;
+  string description = 5;
+  string animal_type = 6;       // e.g., "dog", "cat", "bird"
+  string image_url = 7;         // Optional photo of incident
+}
+
+// Incident response
+message IncidentResponse {
+  string incident_id = 1;
+  string reporter_id = 2;
+  double latitude = 3;
+  double longitude = 4;
+  IncidentType type = 5;
+  IncidentStatus status = 6;
+  string description = 7;
+  string animal_type = 8;
+  string image_url = 9;
+  int32 volunteers_notified = 10;  // Number of nearby volunteers alerted
+  string created_at = 11;
+}
+
+// Request for nearby incidents
+message NearbyRequest {
+  double latitude = 1;
+  double longitude = 2;
+  double radius_meters = 3;  // Search radius
+}
+
+// List of incidents
+message IncidentListResponse {
+  repeated IncidentResponse incidents = 1;
+}

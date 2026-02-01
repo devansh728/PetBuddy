@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "33546940877",
+    "project_id": "petbuddy-7f3c4",
+    "storage_bucket": "petbuddy-7f3c4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:33546940877:android:18b891e9d07a4a2dbdd484",
+        "android_client_info": {
+          "package_name": "com.petbuddy.service"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "33546940877-cd86m56dsjc9qd1h2b2dicb88vs2obok.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALR-5E6u80dR-Kw1s3YmzCHFjUJXMXTZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "33546940877-cd86m56dsjc9qd1h2b2dicb88vs2obok.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

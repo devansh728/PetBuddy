@@ -1,0 +1,3 @@
+# Spring Boot 4.x EnvironmentPostProcessor
+# Note: Uses org.springframework.boot.EnvironmentPostProcessor (not org.springframework.boot.env)
+org.springframework.boot.EnvironmentPostProcessor=com.petbuddy.gateway.config.DotEnvEnvironmentPostProcessor

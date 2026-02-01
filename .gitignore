@@ -1,0 +1,58 @@
+google-services.json
+*.env
+application.properties
+*.properties
+/project-petbuddy-firebase-adminsdk-fbsvc-6701447e18.json
+# --- Gradle ---
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+
+# --- Java & Class Files ---
+bin/
+out/
+*.class
+*.log
+*.ctxt
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# --- IDEs (VS Code, IntelliJ, Eclipse) ---
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.metadata/
+
+# --- Environment Variables (CRITICAL) ---
+# Never commit these as they contain secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# --- gRPC / Protobuf ---
+# If your build generates files into 'src', ignore them here.
+# (If they go into 'build/generated', the 'build/' rule above already catches them)
+src/main/proto/generated/
+
+# --- GraphQL ---
+# Ignore introspection results or generated schemas usually not needed in repo
+schema.json
+
+# --- OS System Files ---
+.DS_Store
+Thumbs.db
+Desktop.ini

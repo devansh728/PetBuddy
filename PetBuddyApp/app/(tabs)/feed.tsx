@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -13,8 +13,9 @@ import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery, useMutation } from '@apollo/client';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { GET_FEED, TOGGLE_LIKE } from '../../src/graphql/operations';
-import type { Post, FeedResult } from '../../src/types';
+import { GET_PROFILE, GET_FEED, TOGGLE_LIKE, UPDATE_LOCATION } from '../../src/graphql/operations';
+import type { UserProfile, Post, FeedResult } from '../../src/types';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -41,7 +42,7 @@ function PostCard({ post, index, onLike }: { post: Post; index: number; onLike: 
           <Text style={styles.avatarEmoji}>🐾</Text>
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>Pet Lover</Text>
+          <Text style={styles.userName}>{post.authorUsername || 'Pet Lover'}</Text>
           <Text style={styles.postTime}>
             {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Just now'}
           </Text>
@@ -95,12 +96,49 @@ export default function FeedScreen() {
   const router = useRouter();
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [updateLocation] = useMutation(UPDATE_LOCATION);
+  const { data: profileData } = useQuery<{ getProfile: UserProfile }>(GET_PROFILE);
 
   const { data, loading, error, refetch, fetchMore } = useQuery<{ getFeed: FeedResult }>(GET_FEED, {
     variables: { page: 0, pageSize: 20 },
   });
 
   const [toggleLike] = useMutation(TOGGLE_LIKE);
+
+  useEffect(() => {
+
+    if (!profileData?.getProfile) return;
+
+    const fetchAndUpdateLocation = async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('Permission to access location was denied');
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced, 
+        });
+
+        const lat = location.coords.latitude;
+        const lon = location.coords.longitude;
+        
+        await updateLocation({
+          variables: {
+            latitude: lat,
+            longitude: lon,
+            isVolunteer: profileData.getProfile.isVolunteer
+          }
+        });
+
+        console.log(`Location updated: ${lat}, ${lon} . Volunteer status: ${profileData.getProfile.isVolunteer}`);
+      } catch (error) {
+        console.error("Error updating location:", error);
+      }
+    };
+    fetchAndUpdateLocation();
+  }, [profileData]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

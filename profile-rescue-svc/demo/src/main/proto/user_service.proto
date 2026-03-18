@@ -10,8 +10,9 @@ option java_outer_classname = "ProfileServiceProto";
 service ProfileService {
   rpc CreateUserProfile (CreateUserRequest) returns (UserProfileResponse);
   rpc GetUserProfile (GetUserRequest) returns (UserProfileResponse);
-  rpc AddPet (AddPetRequest) returns (PetResponse);
+  rpc AddPet (AddPetRequest) returns (PetListResponse);
   rpc GetPetsByUser (GetPetsRequest) returns (PetListResponse);
+  rpc updateVolunteerStatus (UpdateVolunteerStatusRequest) returns (Empty);
   
   // Rescue Module - Geospatial Operations
   rpc UpdateUserLocation (LocationRequest) returns (Empty);
@@ -50,10 +51,7 @@ message UserProfileResponse {
 // Request to add a new pet
 message AddPetRequest {
   string user_id = 1;
-  string name = 2;
-  string breed = 3;
-  int32 age_months = 4;
-  string image_url = 5;
+  repeated PetData pets = 2;
 }
 
 // Pet response
@@ -75,6 +73,20 @@ message GetPetsRequest {
 message PetListResponse {
   repeated PetResponse pets = 1;
 }
+
+// Request to update volunteer status
+message UpdateVolunteerStatusRequest {
+  string user_id = 1;
+  bool is_volunteer = 2;
+}
+
+message PetData {
+  string name = 1;
+  string breed = 2;
+  int32 age_months = 3;
+  string image_url = 4;
+}
+
 
 // ==================== RESCUE MODULE ====================
 

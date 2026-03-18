@@ -23,6 +23,7 @@ export interface Pet {
 export interface Post {
   postId: string;
   userId: string;
+  authorUsername?: string;
   caption?: string;
   mediaUrl?: string;
   locationLat?: number;
@@ -37,6 +38,24 @@ export interface FeedResult {
   posts: Post[];
   totalPages: number;
   hasMore: boolean;
+}
+
+export interface Notification {
+  notificationId: string;
+  actorUsername: string;
+  notificationType: string;
+  postId?: string;
+  postCaption?: string;
+  mediaUrl?: string;
+  isRead: boolean;
+  createdAt?: string;
+}
+
+export interface NotificationsResult {
+  notifications: Notification[];
+  totalPages: number;
+  hasMore: boolean;
+  unreadCount: number;
 }
 
 export interface LikeResult {

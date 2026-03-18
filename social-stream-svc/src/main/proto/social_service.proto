@@ -8,67 +8,72 @@ option java_outer_classname = "SocialServiceProto";
 
 // Social Service for Posts, Feed, and Media handling
 service SocialService {
-  // Generate presigned URL for direct S3 upload
   rpc GetPresignedUploadUrl (UploadRequest) returns (UploadResponse);
   
-  // Create a new post
   rpc CreatePost (CreatePostRequest) returns (PostResponse);
   
-  // Get paginated feed
   rpc GetFeed (FeedRequest) returns (FeedResponse);
+
+  rpc GetUserPosts (GetUserPostsRequest) returns (FeedResponse);
   
-  // Like/Unlike a post
   rpc ToggleLike (LikeRequest) returns (LikeResponse);
   
-  // Get post by ID
   rpc GetPost (GetPostRequest) returns (PostResponse);
+
+  rpc GetNotifications (GetNotificationsRequest) returns (NotificationsResponse);
+
+  rpc MarkNotificationAsRead (MarkNotificationReadRequest) returns (EmptyResponse);
+
+  rpc GetUnreadNotificationCount (EmptyRequest) returns (UnreadCountResponse);
 }
 
-// Request for presigned upload URL
 message UploadRequest {
   string file_name = 1;
-  string content_type = 2;  // e.g., "image/jpeg", "video/mp4"
+  string content_type = 2;
   string user_id = 3;
 }
 
-// Response with presigned URL
 message UploadResponse {
-  string upload_url = 1;      // Presigned PUT URL
-  string media_key = 2;       // S3 object key
+  string upload_url = 1;
+  string media_key = 2;
   int64 expires_in_seconds = 3;
 }
 
-// Request to create a post
 message CreatePostRequest {
   string user_id = 1;
   string caption = 2;
-  string media_key = 3;       // S3 key from upload
+  string media_key = 3;
   double location_lat = 4;
   double location_lon = 5;
 }
 
-// Post response
 message PostResponse {
   string post_id = 1;
   string user_id = 2;
-  string caption = 3;
-  string media_url = 4;       // Full S3 URL
-  double location_lat = 5;
-  double location_lon = 6;
-  int32 like_count = 7;
-  int32 comment_count = 8;
-  bool is_liked = 9;
-  string created_at = 10;
+  string author_username = 3;
+  string caption = 4;
+  string media_url = 5;
+  double location_lat = 6;
+  double location_lon = 7;
+  int32 like_count = 8;
+  int32 comment_count = 9;
+  bool is_liked = 10;
+  string created_at = 11;
 }
 
-// Feed request
 message FeedRequest {
   string user_id = 1;
   int32 page_number = 2;
   int32 page_size = 3;
 }
 
-// Feed response
+message GetUserPostsRequest {
+  string user_id = 1;
+  string requesting_user_id = 2;
+  int32 page_number = 3;
+  int32 page_size = 4;
+}
+
 message FeedResponse {
   repeated PostResponse posts = 1;
   int32 total_pages = 2;
@@ -90,5 +95,48 @@ message LikeResponse {
 // Get post by ID request
 message GetPostRequest {
   string post_id = 1;
-  string requesting_user_id = 2;  // To check if liked
+  string requesting_user_id = 2;
+}
+
+message NotificationMessage {
+  string notification_id = 1;
+  string actor_username = 2;
+  string notification_type = 3;
+  string post_id = 4;
+  string post_caption = 5;
+  string media_url = 6;
+  bool is_read = 7;
+  string created_at = 8;
+}
+
+message GetNotificationsRequest {
+  string user_id = 1;
+  int32 page_number = 2;
+  int32 page_size = 3;
+}
+
+message NotificationsResponse {
+  repeated NotificationMessage notifications = 1;
+  int32 total_pages = 2;
+  bool has_more = 3;
+  int32 unread_count = 4;
+}
+
+message MarkNotificationReadRequest {
+  string notification_id = 1;
+}
+
+message GetUnreadCountRequest {
+  string user_id = 1;
+}
+
+message UnreadCountResponse {
+  int32 count = 1;
+}
+
+message EmptyRequest {
+  string user_id = 1;
+}
+
+message EmptyResponse {
 }

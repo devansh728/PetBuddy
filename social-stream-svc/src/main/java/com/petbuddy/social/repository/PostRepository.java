@@ -21,6 +21,8 @@ public interface PostRepository extends JpaRepository<PostEntity, UUID> {
     // User's posts (userId is now String for Firebase UID)
     List<PostEntity> findByUserIdOrderByCreatedAtDesc(String userId);
 
+    Page<PostEntity> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+
     // Increment like count
     @Modifying
     @Query("UPDATE PostEntity p SET p.likeCount = p.likeCount + 1 WHERE p.id = :postId")

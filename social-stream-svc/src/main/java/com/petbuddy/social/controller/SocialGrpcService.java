@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.grpc.server.service.GrpcService;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -22,6 +23,7 @@ public class SocialGrpcService extends SocialServiceGrpc.SocialServiceImplBase {
 
     private final S3PresignedUrlService s3Service;
     private final FeedService feedService;
+    private final com.petbuddy.social.service.NotificationService notificationService;
 
     @Override
     public void getPresignedUploadUrl(UploadRequest request, StreamObserver<UploadResponse> responseObserver) {
@@ -130,6 +132,37 @@ public class SocialGrpcService extends SocialServiceGrpc.SocialServiceImplBase {
     }
 
     @Override
+    public void getUserPosts(GetUserPostsRequest request, StreamObserver<FeedResponse> responseObserver) {
+        try {
+            log.info("Getting posts for user: {}", request.getUserId());
+
+            FeedService.FeedResult feedResult = feedService.getUserPosts(
+                    request.getUserId(),
+                    request.getPageNumber(),
+                    request.getPageSize(),
+                    request.getRequestingUserId());
+
+            FeedResponse.Builder responseBuilder = FeedResponse.newBuilder()
+                    .setTotalPages(feedResult.totalPages())
+                    .setHasMore(feedResult.hasMore());
+
+            for (PostEntity post : feedResult.posts()) {
+                boolean isLiked = feedResult.likedPostIds().contains(post.getId());
+                responseBuilder.addPosts(mapToPostResponse(post, isLiked));
+            }
+
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("Error getting user posts", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to get user posts: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
     @Transactional
     public void toggleLike(LikeRequest request, StreamObserver<LikeResponse> responseObserver) {
         try {
@@ -212,6 +245,93 @@ public class SocialGrpcService extends SocialServiceGrpc.SocialServiceImplBase {
         }
     }
 
+    @Override
+    public void getNotifications(GetNotificationsRequest request, StreamObserver<NotificationsResponse> responseObserver) {
+        try {
+            log.info("Getting notifications for user: {}", request.getUserId());
+
+            org.springframework.data.domain.Page<com.petbuddy.social.entity.NotificationEntity> page = 
+                notificationService.getNotifications(request.getUserId(), request.getPageNumber(), request.getPageSize());
+
+            NotificationsResponse.Builder responseBuilder = NotificationsResponse.newBuilder();
+
+            for (com.petbuddy.social.entity.NotificationEntity notification : page.getContent()) {
+                NotificationMessage message = NotificationMessage.newBuilder()
+                        .setNotificationId(notification.getId().toString())
+                        .setActorUsername(notification.getActorUsername() != null ? notification.getActorUsername() : "")
+                        .setNotificationType(notification.getNotificationType() != null ? notification.getNotificationType() : "")
+                        .setPostId(notification.getPostId() != null ? notification.getPostId() : "")
+                        .setPostCaption(notification.getPostCaption() != null ? notification.getPostCaption() : "")
+                        .setMediaUrl(notification.getMediaUrl() != null ? notification.getMediaUrl() : "")
+                        .setIsRead(notification.getIsRead())
+                        .setCreatedAt(notification.getCreatedAt() != null ? notification.getCreatedAt().toString() : "")
+                        .build();
+                responseBuilder.addNotifications(message);
+            }
+
+            long unreadCount = notificationService.getUnreadCount(request.getUserId());
+            responseBuilder.setTotalPages(page.getTotalPages());
+            responseBuilder.setHasMore(page.hasNext());
+            responseBuilder.setUnreadCount((int) unreadCount);
+
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("Error getting notifications", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to get notifications: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void markNotificationAsRead(MarkNotificationReadRequest request, StreamObserver<EmptyResponse> responseObserver) {
+        try {
+            log.info("Marking notification as read: {}", request.getNotificationId());
+
+            try {
+                UUID notificationId = UUID.fromString(request.getNotificationId());
+                notificationService.markAsRead(notificationId);
+                responseObserver.onNext(EmptyResponse.newBuilder().build());
+                responseObserver.onCompleted();
+            } catch (IllegalArgumentException e) {
+                responseObserver.onError(Status.INVALID_ARGUMENT
+                        .withDescription("Invalid notification_id format")
+                        .asRuntimeException());
+            }
+
+        } catch (Exception e) {
+            log.error("Error marking notification as read", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to mark notification as read: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getUnreadNotificationCount(EmptyRequest request, StreamObserver<UnreadCountResponse> responseObserver) {
+        try {
+            log.info("Getting unread notification count for user: {}", request.getUserId());
+
+            long count = notificationService.getUnreadCount(request.getUserId());
+
+            UnreadCountResponse response = UnreadCountResponse.newBuilder()
+                    .setCount((int) count)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("Error getting unread notification count", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to get unread notification count: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
     private PostResponse mapToPostResponse(PostEntity post, boolean isLiked) {
         PostResponse.Builder builder = PostResponse.newBuilder()
                 .setPostId(post.getId().toString())
@@ -220,6 +340,8 @@ public class SocialGrpcService extends SocialServiceGrpc.SocialServiceImplBase {
                 .setCommentCount(post.getCommentCount())
                 .setIsLiked(isLiked);
 
+        if (post.getAuthorUsername() != null)
+            builder.setAuthorUsername(post.getAuthorUsername());
         if (post.getCaption() != null)
             builder.setCaption(post.getCaption());
         if (post.getMediaUrl() != null)

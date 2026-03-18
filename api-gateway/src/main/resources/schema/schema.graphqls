@@ -1,41 +1,39 @@
 type Mutation {
-  # User registration
-  registerUser(input: RegisterUserInput!): UserProfile
+  registerUser(input: RegisterUserInput!): UserProfile!
+  updateVolunteerStatus(isVolunteer: Boolean!): Boolean!
+  addPet(pets: [PetInput!]!): [Pet!]!
 
-  # Social - Create post
   createPost(input: CreatePostInput!): Post
 
-  # Social - Toggle like on a post
   toggleLike(postId: ID!): LikeResult
 
-  # Rescue - Update user location (for volunteers)
+  markNotificationAsRead(notificationId: ID!): Boolean!
+
   updateLocation(
     latitude: Float!
     longitude: Float!
     isVolunteer: Boolean!
   ): Boolean
 
-  # Rescue - Report an incident
   reportIncident(input: ReportIncidentInput!): Incident
 }
 
 type Query {
-  # Get current user's profile
-  getProfile: UserProfile
+  getProfile: UserProfile!
+  getPets: [Pet!]!
 
-  # Get user's pets
-  getPets: [Pet]
-
-  # Get social feed
   getFeed(page: Int = 0, pageSize: Int = 20): FeedResult
 
-  # Get presigned upload URL for media
+  getUserPosts(userId: ID!, page: Int = 0, pageSize: Int = 20): FeedResult
+
   getUploadUrl(fileName: String!, contentType: String!): UploadUrlResult
 
-  # Get single post
   getPost(postId: ID!): Post
 
-  # Rescue - Get nearby incidents
+  getNotifications(page: Int = 0, pageSize: Int = 20): NotificationsResult
+
+  getUnreadNotificationCount: Int!
+
   getNearbyIncidents(
     latitude: Float!
     longitude: Float!
@@ -62,7 +60,7 @@ type UserProfile {
   createdAt: String
 }
 
-input AddPetInput {
+input PetInput {
   name: String!
   breed: String
   ageMonths: Int
@@ -90,6 +88,7 @@ input CreatePostInput {
 type Post {
   postId: ID!
   userId: ID!
+  authorUsername: String
   caption: String
   mediaUrl: String
   locationLat: Float
@@ -115,6 +114,24 @@ type UploadUrlResult {
   uploadUrl: String!
   mediaKey: String!
   expiresInSeconds: Int!
+}
+
+type Notification {
+  notificationId: ID!
+  actorUsername: String!
+  notificationType: String!
+  postId: ID
+  postCaption: String
+  mediaUrl: String
+  isRead: Boolean!
+  createdAt: String!
+}
+
+type NotificationsResult {
+  notifications: [Notification!]!
+  totalPages: Int!
+  hasMore: Boolean!
+  unreadCount: Int!
 }
 
 # ==================== RESCUE ====================

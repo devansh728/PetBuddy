@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
+import { NotificationBell } from '../components/NotificationBell';
 
 // Custom Tab Icon Component
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
@@ -49,6 +50,7 @@ export default function TabLayout() {
           title: 'Feed',
           tabBarIcon: ({ focused }) => <TabIcon name="feed" focused={focused} />,
           headerTitle: 'PetBuddy',
+          headerRight: () => <NotificationBell />,
         }}
       />
       <Tabs.Screen
@@ -65,6 +67,7 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ focused }) => <TabIcon name="profile" focused={focused} />,
           headerTitle: 'My Profile',
+          headerRight: () => <NotificationBell />,
         }}
       />
     </Tabs>

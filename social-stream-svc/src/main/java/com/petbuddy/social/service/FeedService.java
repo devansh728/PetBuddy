@@ -29,11 +29,8 @@ public class FeedService {
 
     public static final int DEFAULT_PAGE_SIZE = 20;
 
-    /**
-     * Create a new post.
-     */
     @Transactional
-    @CacheEvict(value = "feed", allEntries = true) // Invalidate feed cache on new post
+    @CacheEvict(value = "feed", allEntries = true)
     public PostEntity createPost(String userId, String caption, String mediaKey,
             Double locationLat, Double locationLon) {
         String mediaUrl = s3Service.getPublicUrl(mediaKey);
@@ -45,20 +42,17 @@ public class FeedService {
                 .mediaUrl(mediaUrl)
                 .locationLat(locationLat)
                 .locationLon(locationLon)
+                .authorUsername("User")
                 .build();
 
         post = postRepository.save(post);
         log.info("Created post: {} for user: {}", post.getId(), userId);
 
-        // Publish async event for content moderation
         eventPublisher.publishPostCreated(post);
 
         return post;
     }
 
-    /**
-     * Get global feed with cache-aside pattern.
-     */
     @Cacheable(value = "feed", key = "'global:' + #page")
     public FeedResult getGlobalFeed(int page, int pageSize, String requestingUserId) {
         log.info("Fetching feed page {} (cache miss)", page);
@@ -68,7 +62,6 @@ public class FeedService {
 
         List<PostEntity> posts = postsPage.getContent();
 
-        // Batch check if user has liked these posts
         Set<UUID> likedPostIds = getLikedPostIds(requestingUserId, posts);
 
         return new FeedResult(
@@ -78,9 +71,23 @@ public class FeedService {
                 postsPage.hasNext());
     }
 
-    /**
-     * Toggle like on a post.
-     */
+    public FeedResult getUserPosts(String userId, int page, int pageSize, String requestingUserId) {
+        log.info("Fetching posts for user: {} page {}", userId, page);
+
+        Pageable pageable = PageRequest.of(page, pageSize > 0 ? pageSize : DEFAULT_PAGE_SIZE);
+        Page<PostEntity> postsPage = postRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+
+        List<PostEntity> posts = postsPage.getContent();
+
+        Set<UUID> likedPostIds = getLikedPostIds(requestingUserId, posts);
+
+        return new FeedResult(
+                posts,
+                likedPostIds,
+                postsPage.getTotalPages(),
+                postsPage.hasNext());
+    }
+
     @Transactional
     public LikeResult toggleLike(String userId, UUID postId) {
         Optional<PostEntity> postOpt = postRepository.findById(postId);
@@ -92,13 +99,20 @@ public class FeedService {
         Optional<PostLikeEntity> existingLike = postLikeRepository.findByUserIdAndPostId(userId, postId);
 
         if (existingLike.isPresent()) {
-            // Unlike
             postLikeRepository.delete(existingLike.get());
             postRepository.decrementLikeCount(postId);
             log.info("User {} unliked post {}", userId, postId);
+
+            eventPublisher.publishLikeDeleted(
+                    userId,
+                    postId.toString(),
+                    post.getUserId(),
+                    post.getCaption(),
+                    post.getMediaUrl(),
+                    "User");
+
             return new LikeResult(false, Math.max(0, post.getLikeCount() - 1));
         } else {
-            // Like
             PostLikeEntity like = PostLikeEntity.builder()
                     .userId(userId)
                     .postId(postId)
@@ -107,11 +121,13 @@ public class FeedService {
             postRepository.incrementLikeCount(postId);
             log.info("User {} liked post {}", userId, postId);
 
-            // Publish async event
             eventPublisher.publishLikeCreated(
                     userId,
                     postId.toString(),
-                    post.getUserId());
+                    post.getUserId(),
+                    post.getCaption(),
+                    post.getMediaUrl(),
+                    "User");
 
             return new LikeResult(true, post.getLikeCount() + 1);
         }

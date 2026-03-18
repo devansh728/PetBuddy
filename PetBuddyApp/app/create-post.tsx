@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -19,8 +19,13 @@ export default function CreatePostScreen() {
   const router = useRouter();
   
   const [caption, setCaption] = useState('');
-  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [uploading, setUploading] = useState(false);
+  
+  // Debug: log images on every render
+  useEffect(() => {
+    console.log('[RENDER] CreatePostScreen - images state:', { count: images.length, uris: images.map(i => i.uri) });
+  }, [images]);
 
   const [getUploadUrl] = useLazyQuery(GET_UPLOAD_URL);
   const [createPost] = useMutation(CREATE_POST, {
@@ -28,7 +33,10 @@ export default function CreatePostScreen() {
   });
 
   const pickImage = async () => {
+    console.log('[DEBUG] pickImage() called');
+    
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log('[DEBUG] Permission status:', status);
     
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Camera roll permission is required.');
@@ -36,14 +44,27 @@ export default function CreatePostScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+      allowsEditing: false,
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets[0]) {
-      setImage(result.assets[0]);
+    console.log('[DEBUG] Picker result:', {
+      canceled: result.canceled,
+      assetsCount: result.assets?.length || 0,
+      assets: result.assets?.map(a => ({ uri: a.uri, type: a.type })),
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      setImages((prev) => {
+        const merged = [...prev, ...result.assets];
+        const uniqueByUri = new Map(merged.map((asset) => [asset.uri, asset]));
+        const updated = Array.from(uniqueByUri.values()).slice(0, 10);
+        console.log('[DEBUG] Images state updated:', { totalCount: updated.length });
+        return updated;
+      });
     }
   };
 
@@ -62,79 +83,122 @@ export default function CreatePostScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImage(result.assets[0]);
+      setImages([result.assets[0]]);
     }
   };
 
   const uploadToS3 = async (uploadUrl: string, imageUri: string, contentType: string) => {
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    
-    await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': contentType,
-      },
-      body: blob,
-    });
+    try {
+      console.log('[DEBUG] Starting S3 upload...', { uploadUrl, imageUri, contentType });
+      
+      const imageResponse = await fetch(imageUri);
+      const blob = await imageResponse.blob();
+      console.log('[DEBUG] Blob created:', { size: blob.size, type: blob.type });
+      
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': contentType,
+        },
+        body: blob,
+      });
+
+      console.log('[DEBUG] Upload response:', {
+        status: uploadResponse.status,
+        statusText: uploadResponse.statusText,
+        headers: Object.fromEntries(uploadResponse.headers.entries()),
+      });
+
+      if (!uploadResponse.ok) {
+        const responseText = await uploadResponse.text().catch(() => '');
+        throw new Error(`Upload failed (${uploadResponse.status}): ${responseText || uploadResponse.statusText}`);
+      }
+
+      console.log('[DEBUG] S3 upload successful');
+    } catch (error: any) {
+      console.error('[ERROR] S3 upload failed:', {
+        message: error.message,
+        stack: error.stack,
+        errorType: error.name,
+      });
+      throw error;
+    }
   };
 
   const handlePost = async () => {
-    if (!image) {
-      Alert.alert('No Image', 'Please select an image for your post.');
+    console.log('[DEBUG] handlePost triggered, images:', images.length);
+    
+    if (images.length === 0) {
+      Alert.alert('No Image', 'Please select at least one image for your post.');
       return;
     }
 
     setUploading(true);
 
     try {
-      // Get file info
-      const fileName = image.uri.split('/').pop() || 'image.jpg';
-      const contentType = image.mimeType || 'image/jpeg';
+      for (let index = 0; index < images.length; index += 1) {
+        const image = images[index];
+        const fileName = image.uri.split('/').pop() || `image-${index + 1}.jpg`;
+        const contentType = image.mimeType || 'image/jpeg';
 
-      // 1. Get presigned URL from backend
-      const { data: uploadData } = await getUploadUrl({
-        variables: { fileName, contentType },
-      });
+        console.log(`[DEBUG] Processing image ${index + 1}/${images.length}:`, { fileName, contentType });
 
-      if (!uploadData?.getUploadUrl) {
-        // Demo mode - skip S3 upload
-        console.log('Demo mode: Skipping S3 upload');
+        const { data: uploadData, error: uploadError } = await getUploadUrl({
+          variables: { fileName, contentType },
+        });
+
+        if (uploadError) {
+          console.error('[ERROR] getUploadUrl failed:', uploadError);
+          throw uploadError;
+        }
+
+        if (!uploadData?.getUploadUrl) {
+          console.log('[DEBUG] Demo mode - creating post without S3 upload');
+          await createPost({
+            variables: {
+              input: {
+                caption: caption.trim() || null,
+                mediaKey: `demo/${fileName}`,
+              },
+            },
+          });
+          continue;
+        }
+
+        const { uploadUrl, mediaKey } = uploadData.getUploadUrl;
+        console.log('[DEBUG] Got presigned URL, starting S3 upload:', { mediaKey });
         
-        await createPost({
+        await uploadToS3(uploadUrl, image.uri, contentType);
+        console.log('[DEBUG] S3 upload complete, creating post...');
+
+        const { data: postData, error: postError } = await createPost({
           variables: {
             input: {
               caption: caption.trim() || null,
-              mediaKey: `demo/${fileName}`,
+              mediaKey,
             },
           },
         });
 
-        Alert.alert('Success', 'Your post has been created!');
-        router.back();
-        return;
+        if (postError) {
+          console.error('[ERROR] createPost failed:', postError);
+          throw postError;
+        }
+
+        console.log('[DEBUG] Post created successfully:', postData);
       }
 
-      const { uploadUrl, mediaKey } = uploadData.getUploadUrl;
-
-      // 2. Upload image directly to S3
-      await uploadToS3(uploadUrl, image.uri, contentType);
-
-      // 3. Create post with the media key
-      await createPost({
-        variables: {
-          input: {
-            caption: caption.trim() || null,
-            mediaKey,
-          },
-        },
-      });
-
-      Alert.alert('Success', 'Your post has been created!');
+      console.log('[DEBUG] All posts created, navigating back');
+      Alert.alert('Success', `${images.length} post${images.length > 1 ? 's' : ''} created successfully.`);
       router.back();
 
     } catch (error: any) {
-      console.error('Post creation failed:', error);
+      console.error('[ERROR] Post creation pipeline failed:', {
+        message: error.message,
+        stack: error.stack,
+        graphQLErrors: error.graphQLErrors,
+        networkError: error.networkError,
+      });
       Alert.alert('Error', error.message || 'Failed to create post. Please try again.');
     } finally {
       setUploading(false);
@@ -145,14 +209,22 @@ export default function CreatePostScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Image Section */}
       <View style={styles.imageSection}>
-        {image ? (
+        {images.length > 0 ? (
           <View style={styles.imageContainer}>
-            <Image source={{ uri: image.uri }} style={styles.image} />
+            <Image source={{ uri: images[0].uri }} style={styles.image} />
+            {images.length > 1 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>+{images.length - 1}</Text>
+              </View>
+            )}
             <TouchableOpacity 
               style={styles.removeButton}
-              onPress={() => setImage(null)}
+              onPress={() => setImages([])}
             >
               <Text style={styles.removeButtonText}>✕</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addMoreButton} onPress={pickImage}>
+              <Text style={styles.addMoreButtonText}>Add More</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -191,9 +263,9 @@ export default function CreatePostScreen() {
 
       {/* Post Button */}
       <TouchableOpacity 
-        style={[styles.postButton, !image && styles.postButtonDisabled]}
+        style={[styles.postButton, images.length === 0 && styles.postButtonDisabled]}
         onPress={handlePost}
-        disabled={!image || uploading}
+        disabled={images.length === 0 || uploading}
       >
         {uploading ? (
           <ActivityIndicator color="#fff" />
@@ -230,6 +302,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
+  badge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  badgeText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
   image: {
     width: '100%',
     aspectRatio: 1,
@@ -249,6 +335,20 @@ const styles = StyleSheet.create({
   removeButtonText: {
     color: '#fff',
     fontSize: 16,
+  },
+  addMoreButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  addMoreButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   imagePlaceholder: {
     backgroundColor: '#F3F4F6',

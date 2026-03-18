@@ -76,6 +76,7 @@ const cache = new InMemoryCache({
       keyFields: ['incidentId'],
     },
   },
+  // Removed deprecated canonizeResults option (Apollo 3.14.0+)
 });
 
 // Create Apollo Client

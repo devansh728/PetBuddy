@@ -16,16 +16,14 @@ public class EventPublisherService {
 
     private final RabbitTemplate rabbitTemplate;
 
-    /**
-     * Publishes a post.created event for async processing.
-     * Use case: content moderation, feed warming, notifications.
-     */
     public void publishPostCreated(PostEntity post) {
         Map<String, Object> event = Map.of(
                 "eventType", "post.created",
                 "postId", post.getId().toString(),
                 "userId", post.getUserId(),
                 "mediaKey", post.getMediaKey(),
+                "caption", post.getCaption() != null ? post.getCaption() : "",
+                "mediaUrl", post.getMediaUrl() != null ? post.getMediaUrl() : "",
                 "timestamp", System.currentTimeMillis());
 
         log.info("Publishing post.created event for postId: {}", post.getId());
@@ -35,22 +33,39 @@ public class EventPublisherService {
                 event);
     }
 
-    /**
-     * Publishes a like.created event for async processing.
-     * Use case: notifications, gamification points.
-     */
-    public void publishLikeCreated(String userId, String postId, String postOwnerId) {
+    public void publishLikeCreated(String userId, String postId, String postOwnerId, String postCaption, String mediaUrl, String username) {
         Map<String, Object> event = Map.of(
                 "eventType", "like.created",
                 "userId", userId,
                 "postId", postId,
                 "postOwnerId", postOwnerId,
+                "postCaption", postCaption != null ? postCaption : "",
+                "mediaUrl", mediaUrl != null ? mediaUrl : "",
+                "username", username,
                 "timestamp", System.currentTimeMillis());
 
         log.info("Publishing like.created event for postId: {} by userId: {}", postId, userId);
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.SOCIAL_EXCHANGE,
                 RabbitMQConfig.LIKE_CREATED_ROUTING_KEY,
+                event);
+    }
+
+    public void publishLikeDeleted(String userId, String postId, String postOwnerId, String postCaption, String mediaUrl, String username) {
+        Map<String, Object> event = Map.of(
+                "eventType", "like.deleted",
+                "userId", userId,
+                "postId", postId,
+                "postOwnerId", postOwnerId,
+                "postCaption", postCaption != null ? postCaption : "",
+                "mediaUrl", mediaUrl != null ? mediaUrl : "",
+                "username", username,
+                "timestamp", System.currentTimeMillis());
+
+        log.info("Publishing like.deleted event for postId: {} by userId: {}", postId, userId);
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.SOCIAL_EXCHANGE,
+                RabbitMQConfig.LIKE_DELETED_ROUTING_KEY,
                 event);
     }
 }

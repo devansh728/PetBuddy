@@ -26,6 +26,13 @@ public class RescueDataFetcher {
 
     private final ProfileServiceGrpc.ProfileServiceBlockingStub profileService;
 
+    private String getInternalUserId(String firebaseUid) {
+        GetUserRequest request = GetUserRequest.newBuilder()
+                .setFirebaseUid(firebaseUid)
+                .build();
+        return profileService.getUserProfile(request).getUserId();
+    }
+
     @DgsMutation
     public Boolean updateLocation(
             @InputArgument("latitude") Double latitude,
@@ -36,7 +43,7 @@ public class RescueDataFetcher {
 
         try {
             LocationRequest request = LocationRequest.newBuilder()
-                    .setUserId(auth.getUid())
+                    .setUserId(getInternalUserId(auth.getUid()))
                     .setLatitude(latitude)
                     .setLongitude(longitude)
                     .setIsVolunteer(isVolunteer != null && isVolunteer)

@@ -26,7 +26,10 @@ public class PostEntity {
     private UUID id;
 
     @Column(nullable = false, length = 128)
-    private String userId; // Firebase UID (not UUID)
+    private String userId;
+
+    @Column(length = 255)
+    private String authorUsername;
 
     @Column(length = 2000)
     private String caption;

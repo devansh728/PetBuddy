@@ -109,10 +109,64 @@ public class RescueGrpcService extends ProfileServiceGrpc.ProfileServiceImplBase
         }
     }
 
+    // ==================== VOLUNTEER UPDATE ===========================
+
+    @Override
+    @Transactional
+    public void updateVolunteerStatus(UpdateVolunteerStatusRequest request, StreamObserver<Empty> responseObserver) {
+        try {
+            log.info("Updating volunteer status for user: {}", request.getUserId());
+
+            UUID userId;
+            try {
+                userId = UUID.fromString(request.getUserId());
+            } catch (IllegalArgumentException e) {
+                responseObserver.onError(Status.INVALID_ARGUMENT
+                        .withDescription("Invalid user_id format")
+                        .asRuntimeException());
+                return;
+            }
+
+            Optional<UserEntity> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                responseObserver.onError(Status.NOT_FOUND
+                        .withDescription("User not found")
+                        .asRuntimeException());
+                return;
+            }
+
+            UserEntity user = userOpt.get();
+            user.setIsVolunteer(request.getIsVolunteer());
+            userRepository.save(user);
+
+            log.info("Volunteer status updated for user: {}", userId);
+
+            responseObserver.onNext(Empty.newBuilder().build());
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("Error updating volunteer status", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to update volunteer status: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
     // ==================== RESCUE MODULE OPERATIONS ====================
 
     /**
      * Update user's location for volunteer tracking.
+     * 
+     * Senior-Level Resume Enhancements (Optional for the future):
+If an interviewer asks, "What if the user moves 10km while the app is open?"
+
+I tell them:
+
+"For Version 1, location is synced upon app launch to save mobile battery and network I/O. However, the architecture 
+is designed to support gRPC Client Streaming. By upgrading the updateUserLocation RPC to rpc StreamUserLocation (stream LocationRequest) 
+returns (Empty), the React Native app could use Location.watchPositionAsync to continuously stream coordinates
+through the GraphQL Subscription/WebSocket Gateway directly to the PostGIS database, enabling real-time Uber-like 
+volunteer tracking."
      */
     @Override
     @Transactional
@@ -283,7 +337,7 @@ public class RescueGrpcService extends ProfileServiceGrpc.ProfileServiceImplBase
 
     @Override
     @Transactional
-    public void addPet(AddPetRequest request, StreamObserver<PetResponse> responseObserver) {
+    public void addPet(AddPetRequest request, StreamObserver<PetListResponse> responseObserver) {
         try {
             log.info("Adding pet for userId: {}", request.getUserId());
 
@@ -304,19 +358,25 @@ public class RescueGrpcService extends ProfileServiceGrpc.ProfileServiceImplBase
                         .asRuntimeException());
                 return;
             }
+            UserEntity owner = userOpt.get();
 
-            PetEntity pet = PetEntity.builder()
-                    .name(request.getName())
-                    .breed(request.getBreed().isEmpty() ? null : request.getBreed())
-                    .ageMonths(request.getAgeMonths() > 0 ? request.getAgeMonths() : null)
-                    .imageUrl(request.getImageUrl().isEmpty() ? null : request.getImageUrl())
-                    .owner(userOpt.get())
-                    .build();
+            List<PetEntity> petsToSave = request.getPetsList().stream().map(petData -> PetEntity.builder()
+                    .name(petData.getName())
+                    .breed(petData.getBreed().isEmpty() ? null : petData.getBreed())
+                    .ageMonths(petData.getAgeMonths() > 0 ? petData.getAgeMonths() : null)
+                    .imageUrl(petData.getImageUrl().isEmpty() ? null : petData.getImageUrl())
+                    .owner(owner)
+                    .build()).toList();
 
-            pet = petRepository.save(pet);
-            log.info("Pet created successfully with id: {}", pet.getId());
+            List<PetEntity> savedPets = petRepository.saveAll(petsToSave);
+            log.info("Successfully batch saved {} pets", savedPets.size());
 
-            responseObserver.onNext(mapToPetResponse(pet));
+            PetListResponse.Builder responseBuilder = PetListResponse.newBuilder();
+            for (PetEntity pet : savedPets) {
+                responseBuilder.addPets(mapToPetResponse(pet));
+            }
+
+            responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
 
         } catch (Exception e) {

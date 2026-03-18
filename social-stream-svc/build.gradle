@@ -55,6 +55,8 @@ dependencies {
     
     // javax.annotation API (for @Generated in generated protobuf code)
     implementation 'javax.annotation:javax.annotation-api:1.3.2'
+
+     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
     
     // Lombok
     compileOnly 'org.projectlombok:lombok'

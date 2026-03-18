@@ -50,6 +50,35 @@ export const UPDATE_LOCATION = gql`
   }
 `;
 
+export const ADD_PET = gql`
+  mutation AddPet($pets: [PetInput!]!) {
+    addPet(pets: $pets) {
+      petId
+      name
+      breed
+      ageMonths
+      imageUrl
+      createdAt
+    }
+  }
+`;
+
+// Request to add a new pet
+// message AddPetRequest {
+//   string user_id = 1;
+//   repeated PetData pets = 2;
+// }
+
+// Pet response
+// message PetResponse {
+//   string pet_id = 1;
+//   string name = 2;
+//   string breed = 3;
+//   int32 age_months = 4;
+//   string image_url = 5;
+//   string created_at = 6;
+// }
+
 // ==================== SOCIAL QUERIES ====================
 
 export const GET_FEED = gql`
@@ -58,6 +87,29 @@ export const GET_FEED = gql`
       posts {
         postId
         userId
+        authorUsername
+        caption
+        mediaUrl
+        locationLat
+        locationLon
+        likeCount
+        commentCount
+        isLiked
+        createdAt
+      }
+      totalPages
+      hasMore
+    }
+  }
+`;
+
+export const GET_USER_POSTS = gql`
+  query GetUserPosts($userId: ID!, $page: Int, $pageSize: Int) {
+    getUserPosts(userId: $userId, page: $page, pageSize: $pageSize) {
+      posts {
+        postId
+        userId
+        authorUsername
         caption
         mediaUrl
         locationLat
@@ -162,5 +214,47 @@ export const REPORT_INCIDENT = gql`
       volunteersNotified
       createdAt
     }
+  }
+`;
+
+export const UPDATE_VOLUNTEER_STATUS = gql`
+  mutation UpdateVolunteerStatus($isVolunteer: Boolean!) {
+    updateVolunteerStatus(isVolunteer: $isVolunteer)
+  }
+`;
+
+// ==================== NOTIFICATION QUERIES ====================
+
+export const GET_NOTIFICATIONS = gql`
+  query GetNotifications($page: Int, $pageSize: Int) {
+    getNotifications(page: $page, pageSize: $pageSize) {
+      notifications {
+        notificationId
+        actorUsername
+        notificationType
+        postId
+        postCaption
+        mediaUrl
+        isRead
+        createdAt
+      }
+      totalPages
+      hasMore
+      unreadCount
+    }
+  }
+`;
+
+export const GET_UNREAD_NOTIFICATION_COUNT = gql`
+  query GetUnreadNotificationCount {
+    getUnreadNotificationCount
+  }
+`;
+
+// ==================== NOTIFICATION MUTATIONS ====================
+
+export const MARK_NOTIFICATION_AS_READ = gql`
+  mutation MarkNotificationAsRead($notificationId: ID!) {
+    markNotificationAsRead(notificationId: $notificationId)
   }
 `;

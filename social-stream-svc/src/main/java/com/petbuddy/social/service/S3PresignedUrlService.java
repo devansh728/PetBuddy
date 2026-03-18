@@ -28,6 +28,9 @@ public class S3PresignedUrlService {
     @Value("${aws.s3.region:ap-south-1}")
     private String region;
 
+    @Value("${aws.s3.endpoint:http://localhost:9000}")
+    private String s3Endpoint;
+
     /**
      * Generates a presigned PUT URL for direct client upload to S3.
      * 
@@ -64,9 +67,13 @@ public class S3PresignedUrlService {
 
     /**
      * Builds the public S3 URL for a media key.
+     * Uses endpoint from config to support both AWS S3 and MinIO.
      */
     public String getPublicUrl(String mediaKey) {
-        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, mediaKey);
+        // Construct URL: {endpoint}/{bucketName}/{mediaKey}
+        // e.g., http://localhost:9000/petbuddy-media/users/userId/media/...
+        String baseUrl = s3Endpoint.replaceAll("/$", ""); // Remove trailing slash if present
+        return String.format("%s/%s/%s", baseUrl, bucketName, mediaKey);
     }
 
     private String sanitizeFileName(String fileName) {

@@ -121,6 +121,40 @@ public class SocialDataFetcher {
         }
     }
 
+    @DgsQuery
+    public Map<String, Object> getUserPosts(
+            @InputArgument("userId") String userId,
+            @InputArgument("page") Integer page,
+            @InputArgument("pageSize") Integer pageSize) {
+
+        AuthContext auth = getAuthContext();
+
+        try {
+            com.petbuddy.social.grpc.GetUserPostsRequest request = com.petbuddy.social.grpc.GetUserPostsRequest.newBuilder()
+                    .setUserId(userId)
+                    .setRequestingUserId(auth.getUid())
+                    .setPageNumber(page != null ? page : 0)
+                    .setPageSize(pageSize != null ? pageSize : 20)
+                    .build();
+
+            log.info("Getting posts for user: {}", userId);
+            FeedResponse response = socialService.getUserPosts(request);
+
+            List<Map<String, Object>> posts = response.getPostsList().stream()
+                    .map(this::mapPostToMap)
+                    .collect(Collectors.toList());
+
+            return Map.of(
+                    "posts", posts,
+                    "totalPages", response.getTotalPages(),
+                    "hasMore", response.getHasMore());
+
+        } catch (StatusRuntimeException e) {
+            log.error("gRPC call failed: {}", e.getStatus().getDescription());
+            throw new GraphQLException("Failed to get user posts: " + e.getStatus().getDescription());
+        }
+    }
+
     @DgsMutation
     public Map<String, Object> toggleLike(@InputArgument("postId") String postId) {
         AuthContext auth = getAuthContext();
@@ -163,19 +197,107 @@ public class SocialDataFetcher {
         }
     }
 
-    private Map<String, Object> mapPostToMap(PostResponse post) {
-        return Map.of(
-                "postId", post.getPostId(),
-                "userId", post.getUserId(),
-                "caption", post.getCaption(),
-                "mediaUrl", post.getMediaUrl(),
-                "locationLat", post.getLocationLat(),
-                "locationLon", post.getLocationLon(),
-                "likeCount", post.getLikeCount(),
-                "commentCount", post.getCommentCount(),
-                "isLiked", post.getIsLiked(),
-                "createdAt", post.getCreatedAt());
+    @DgsQuery
+    public Map<String, Object> getNotifications(
+            @InputArgument("page") Integer page,
+            @InputArgument("pageSize") Integer pageSize) {
+
+        AuthContext auth = getAuthContext();
+
+        try {
+            com.petbuddy.social.grpc.GetNotificationsRequest request = com.petbuddy.social.grpc.GetNotificationsRequest.newBuilder()
+                    .setUserId(auth.getUid())
+                    .setPageNumber(page != null ? page : 0)
+                    .setPageSize(pageSize != null ? pageSize : 20)
+                    .build();
+
+            log.info("Getting notifications for user: {}", auth.getUid());
+            com.petbuddy.social.grpc.NotificationsResponse response = socialService.getNotifications(request);
+
+            List<Map<String, Object>> notifications = response.getNotificationsList().stream()
+                    .map(this::mapNotificationToMap)
+                    .collect(Collectors.toList());
+
+            return Map.of(
+                    "notifications", notifications,
+                    "totalPages", response.getTotalPages(),
+                    "hasMore", response.getHasMore(),
+                    "unreadCount", response.getUnreadCount());
+
+        } catch (StatusRuntimeException e) {
+            log.error("gRPC call failed: {}", e.getStatus().getDescription());
+            throw new GraphQLException("Failed to get notifications: " + e.getStatus().getDescription());
+        }
     }
+
+    @DgsQuery
+    public Integer getUnreadNotificationCount() {
+        AuthContext auth = getAuthContext();
+
+        try {
+            com.petbuddy.social.grpc.EmptyRequest request = com.petbuddy.social.grpc.EmptyRequest.newBuilder()
+                    .setUserId(auth.getUid())
+                    .build();
+
+            log.info("Getting unread notification count for user: {}", auth.getUid());
+            com.petbuddy.social.grpc.UnreadCountResponse response = socialService.getUnreadNotificationCount(request);
+
+            return response.getCount();
+
+        } catch (StatusRuntimeException e) {
+            log.error("gRPC call failed: {}", e.getStatus().getDescription());
+            throw new GraphQLException("Failed to get unread notification count: " + e.getStatus().getDescription());
+        }
+    }
+
+    @DgsMutation
+    public Boolean markNotificationAsRead(@InputArgument("notificationId") String notificationId) {
+        AuthContext auth = getAuthContext();
+
+        try {
+            com.petbuddy.social.grpc.MarkNotificationReadRequest request = com.petbuddy.social.grpc.MarkNotificationReadRequest.newBuilder()
+                    .setNotificationId(notificationId)
+                    .build();
+
+            log.info("Marking notification as read: {}", notificationId);
+            socialService.markNotificationAsRead(request);
+
+            return true;
+
+        } catch (StatusRuntimeException e) {
+            log.error("gRPC call failed: {}", e.getStatus().getDescription());
+            throw new GraphQLException("Failed to mark notification as read: " + e.getStatus().getDescription());
+        }
+    }
+
+    private Map<String, Object> mapNotificationToMap(com.petbuddy.social.grpc.NotificationMessage notification) {
+        return Map.of(
+                "notificationId", notification.getNotificationId(),
+                "actorUsername", notification.getActorUsername(),
+                "notificationType", notification.getNotificationType(),
+                "postId", notification.getPostId(),
+                "postCaption", notification.getPostCaption(),
+                "mediaUrl", notification.getMediaUrl(),
+                "isRead", notification.getIsRead(),
+                "createdAt", notification.getCreatedAt());
+    }
+
+    // Error discovered : map.of only accept up to 10 entries, so we need to use Map.ofEntries for more than 10 fields in the post mapping
+    private Map<String, Object> mapPostToMap(PostResponse post) {
+    return Map.ofEntries(
+            Map.entry("postId", post.getPostId()),
+            Map.entry("userId", post.getUserId()),
+            Map.entry("authorUsername", post.getAuthorUsername()),
+            Map.entry("caption", post.getCaption()),
+            Map.entry("mediaUrl", post.getMediaUrl()),
+            Map.entry("locationLat", post.getLocationLat()),
+            Map.entry("locationLon", post.getLocationLon()),
+            Map.entry("likeCount", post.getLikeCount()),
+            Map.entry("commentCount", post.getCommentCount()),
+            Map.entry("isLiked", post.getIsLiked()),
+            Map.entry("createdAt", post.getCreatedAt())
+    );
+}
 
     private AuthContext getAuthContext() {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
